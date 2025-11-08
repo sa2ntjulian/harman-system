@@ -1,0 +1,298 @@
+# Bitnami MySQL Helm Chart 설정
+# 참고: https://artifacthub.io/packages/helm/bitnami/mysql
+
+# Global 설정
+global:
+  security:
+    allowInsecureImages: true  # bitnamilegacy 이미지 사용 허용
+
+mysql:
+  enabled: true
+
+  # ===========================================
+  # 이미지 설정
+  # ===========================================
+  # Bitnami Legacy 저장소 사용
+  # 참고: 2025년 8월 28일부터 기존 이미지는 bitnamilegacy 저장소로 이동
+  # https://hub.docker.com/r/bitnamilegacy/mysql
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mysql
+    tag: 8.4.3-debian-12-r4
+    pullPolicy: IfNotPresent
+
+  # ===========================================
+  # 아키텍처 설정
+  # ===========================================
+  # 싱글 인스턴스 배포 (테스트/개발 환경)
+  # 프로덕션에서는 primary-secondary 구조 고려
+  architecture: standalone
+
+  # ===========================================
+  # 인증 설정
+  # ===========================================
+  auth:
+    # Root 사용자 설정
+    rootPassword: "root123!@#"
+    
+    # 애플리케이션 데이터베이스 및 사용자
+    database: "harman"
+    username: "harman"
+    password: "harman123!@#"
+    
+    # Replication 사용자 (고가용성 구성 시)
+    replicationUser: replicator
+    replicationPassword: ""
+    
+    # 기존 Secret 사용 (선택사항)
+    # existingSecret: "mysql-secret"
+    # usePasswordFiles: false
+
+  # ===========================================
+  # Primary (주 인스턴스) 설정
+  # ===========================================
+  primary:
+    # 이름 설정
+    name: primary
+    
+    # 영구 스토리지 설정
+    persistence:
+      enabled: true
+      # storageClass: "standard"
+      storageClass: ""  # 기본 StorageClass 사용
+      accessModes:
+        - ReadWriteOnce
+      size: 8Gi
+      # annotations: {}
+      # selector: {}
+    
+    # Init Container: 데이터 디렉토리 검증 및 초기화
+    # MySQL 시스템 테이블이 없거나 불완전한 경우 데이터를 삭제하여 깨끗한 초기화 보장
+    initContainers:
+      - name: clean-data-dir
+        image: bitnamilegacy/os-shell:12-debian-12-r33
+        command:
+          - sh
+          - -c
+          - |
+            echo "Checking MySQL data directory..."
+            if [ -d "/bitnami/mysql/data" ]; then
+              # MySQL 시스템 데이터베이스가 올바르게 초기화되었는지 확인
+              if [ -d "/bitnami/mysql/data/mysql" ]; then
+                # 필수 시스템 테이블 파일 존재 여부 확인
+                if [ ! -f "/bitnami/mysql/data/mysql/user.ibd" ] || \
+                   [ ! -f "/bitnami/mysql/data/mysql/db.ibd" ] || \
+                   [ ! -f "/bitnami/mysql/data/mysql/plugin.ibd" ]; then
+                  echo "MySQL system tables are incomplete or corrupted. Cleaning data directory..."
+                  rm -rf /bitnami/mysql/data/*
+                  rm -rf /bitnami/mysql/data/.[!.]*
+                  echo "Data directory cleaned. MySQL will initialize fresh."
+                else
+                  echo "MySQL system tables exist and appear valid."
+                fi
+              else
+                echo "MySQL system database directory not found. Cleaning for fresh initialization..."
+                rm -rf /bitnami/mysql/data/*
+                rm -rf /bitnami/mysql/data/.[!.]*
+                echo "Data directory cleaned."
+              fi
+            else
+              echo "Data directory does not exist, will be created by MySQL."
+            fi
+        volumeMounts:
+          - name: data
+            mountPath: /bitnami/mysql/data
+    
+    # 리소스 요청 및 제한
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+    
+    # 파드 보안 컨텍스트
+    podSecurityContext:
+      enabled: true
+      fsGroup: 1001
+    
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      runAsNonRoot: true
+      privileged: false
+      allowPrivilegeEscalation: false
+    
+    # 헬스 체크 설정
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 120
+      periodSeconds: 10
+      timeoutSeconds: 5
+      successThreshold: 1
+      failureThreshold: 3
+    
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      successThreshold: 1
+      failureThreshold: 3
+    
+    startupProbe:
+      enabled: true
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      successThreshold: 1
+      failureThreshold: 15
+    
+    # 커스텀 설정 파일 (선택사항)
+    configuration: |-
+      [mysqld]
+      # MySQL 8.4에서는 default_authentication_plugin이 제거됨
+      # 대신 authentication_policy 사용 (필요 시)
+      # authentication_policy=mysql_native_password
+      skip-name-resolve
+      explicit_defaults_for_timestamp
+      basedir=/opt/bitnami/mysql
+      plugin_dir=/opt/bitnami/mysql/lib/plugin
+      port=3306
+      socket=/opt/bitnami/mysql/tmp/mysql.sock
+      datadir=/bitnami/mysql/data
+      tmpdir=/opt/bitnami/mysql/tmp
+      max_allowed_packet=16M
+      bind-address=*
+      pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
+      log-error=/opt/bitnami/mysql/logs/mysqld.log
+      character-set-server=UTF8MB4
+      collation-server=utf8mb4_unicode_ci
+      slow_query_log=0
+      long_query_time=10.0
+      # InnoDB 설정
+      innodb_buffer_pool_size=256M
+      innodb_redo_log_capacity=134217728
+      innodb_flush_method=O_DIRECT
+      innodb_file_per_table=1
+      # 연결 설정
+      max_connections=150
+      # 쿼리 캐시 (MySQL 8.0에서는 제거됨)
+      # query_cache_type=0
+      # query_cache_size=0
+
+      [client]
+      port=3306
+      socket=/opt/bitnami/mysql/tmp/mysql.sock
+      default-character-set=UTF8MB4
+      plugin_dir=/opt/bitnami/mysql/lib/plugin
+
+      [manager]
+      port=3306
+      socket=/opt/bitnami/mysql/tmp/mysql.sock
+      pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
+    
+    # 초기 데이터베이스 스키마 설정
+    initdbScripts:
+      01-init-schema.sql: |
+        -- Harman 파일 수집 시스템 데이터베이스 스키마
+        
+        -- 수집 메타데이터 테이블
+        CREATE TABLE IF NOT EXISTS file_collections (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            node_name VARCHAR(255) NOT NULL COMMENT '데이터가 수집된 노드명',
+            mount_path VARCHAR(500) NOT NULL COMMENT '마운트된 디렉토리 경로',
+            collected_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '데이터 수집 시각',
+            file_count INT NOT NULL COMMENT '수집된 파일 개수',
+            INDEX idx_node_name (node_name),
+            INDEX idx_collected_at (collected_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='파일 수집 이벤트 메타데이터';
+        
+        -- 개별 파일 목록 테이블
+        CREATE TABLE IF NOT EXISTS collected_files (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            collection_id BIGINT NOT NULL COMMENT 'file_collections 외래키',
+            file_name VARCHAR(1000) NOT NULL COMMENT '개별 파일명',
+            INDEX idx_collection_id (collection_id),
+            FOREIGN KEY (collection_id) REFERENCES file_collections(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='수집된 개별 파일 목록';
+        
+        -- 데이터 조회 예시 뷰 생성
+        CREATE OR REPLACE VIEW v_collection_summary AS
+        SELECT 
+            fc.id,
+            fc.node_name,
+            fc.mount_path,
+            fc.collected_at,
+            fc.file_count,
+            GROUP_CONCAT(cf.file_name ORDER BY cf.file_name SEPARATOR ', ') AS file_list
+        FROM file_collections fc
+        LEFT JOIN collected_files cf ON fc.id = cf.collection_id
+        GROUP BY fc.id, fc.node_name, fc.mount_path, fc.collected_at, fc.file_count
+        ORDER BY fc.collected_at DESC;
+    
+    # Pod Affinity (선택사항)
+    # affinity: {}
+    # nodeSelector: {}
+    # tolerations: []
+    
+    # Pod Disruption Budget
+    # pdb:
+    #   create: false
+    #   minAvailable: 1
+
+  # ===========================================
+  # 서비스 설정
+  # ===========================================
+  service:
+    type: ClusterIP
+    ports:
+      mysql: 3306
+    # nodePorts:
+    #   mysql: ""
+    # clusterIP: ""
+    # loadBalancerIP: ""
+    # externalTrafficPolicy: Cluster
+    annotations: {}
+    # sessionAffinity: None
+
+  # ===========================================
+  # 네트워크 정책 (선택사항)
+  # ===========================================
+  networkPolicy:
+    enabled: false
+    # allowExternal: true
+    # explicitNamespacesSelector: {}
+
+  # ===========================================
+  # 메트릭 설정
+  # ===========================================
+  metrics:
+    enabled: false
+    # Prometheus Exporter 설정
+    # image:
+    #   registry: docker.io
+    #   repository: bitnami/mysqld-exporter
+    #   tag: 0.15.1-debian-12-r4
+    # serviceMonitor:
+    #   enabled: false
+    # prometheusRule:
+    #   enabled: false
+
+  # ===========================================
+  # 볼륨 권한 설정
+  # ===========================================
+  volumePermissions:
+    enabled: true  # 권한 문제 해결을 위해 활성화
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/os-shell
+      tag: 12-debian-12-r33
+
+  # ===========================================
+  # 백업 설정 (선택사항)
+  # ===========================================
+  # 별도의 CronJob으로 백업 구성 권장
+  # mysqldump를 이용한 정기 백업 스크립트 추가 가능
+

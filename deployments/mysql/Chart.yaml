@@ -1,0 +1,17 @@
+apiVersion: v2
+name: harman-mysql
+description: MySQL database for Harman file collection system
+type: application
+version: 1.0.0
+appVersion: "8.4.5"
+
+# Bitnami MySQL Helm Chart 의존성
+# 참고: https://artifacthub.io/packages/helm/bitnami/mysql
+# 공식 문서: https://artifacthub.io/packages/helm/bitnami/mysql
+# MySQL 8.4.x를 사용하는 차트 버전 (values.yaml의 이미지와 일치)
+dependencies:
+  - name: mysql
+    version: 12.3.5
+    repository: https://charts.bitnami.com/bitnami
+    condition: mysql.enabled
+
