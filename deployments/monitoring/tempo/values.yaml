@@ -1,0 +1,49 @@
+tempo:
+  image:
+    repository: grafana/tempo
+    tag: "2.7.1"
+
+mode: monolithic
+
+storage:
+  type: filesystem
+  filesystem:
+    path: /var/tempo
+
+ingestion:
+  traces:
+    otlp:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+
+service:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3200
+      targetPort: 3200
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+    cpu: 500m
+

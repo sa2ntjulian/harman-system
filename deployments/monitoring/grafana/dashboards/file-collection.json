@@ -1,0 +1,88 @@
+{
+  "dashboard": {
+    "title": "File Collector Metrics",
+    "tags": ["file-collector", "harman"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "File Collection Count",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(file_collection_count[5m])",
+            "legendFormat": "{{node_name}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Collected Files",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "file_collection_files",
+            "legendFormat": "{{node_name}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Collection Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(file_collection_duration_ms_bucket[5m]))",
+            "legendFormat": "p95 - {{node_name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(file_collection_duration_ms_bucket[5m]))",
+            "legendFormat": "p50 - {{node_name}}",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "DB Operation Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(db_operation_duration_ms_bucket[5m]))",
+            "legendFormat": "p95 - {{node_name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(db_operation_duration_ms_bucket[5m]))",
+            "legendFormat": "p50 - {{node_name}}",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Collection Errors",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(file_collection_errors[5m])",
+            "legendFormat": "{{node_name}} - {{error_type}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}
+
