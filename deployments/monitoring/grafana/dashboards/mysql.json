@@ -1,0 +1,75 @@
+{
+  "dashboard": {
+    "title": "MySQL Metrics",
+    "tags": ["mysql", "harman"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "MySQL Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "mysql_global_status_threads_connected",
+            "legendFormat": "Connected",
+            "refId": "A"
+          },
+          {
+            "expr": "mysql_global_variables_max_connections",
+            "legendFormat": "Max Connections",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "MySQL Query Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(mysql_global_status_queries[5m])",
+            "legendFormat": "Queries/sec",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Table Sizes",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "mysql_info_schema_table_rows",
+            "format": "table",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "File Collection Table Growth",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "mysql_info_schema_table_rows{table_schema=\"harman\", table_name=\"file_collections\"}",
+            "legendFormat": "file_collections",
+            "refId": "A"
+          },
+          {
+            "expr": "mysql_info_schema_table_rows{table_schema=\"harman\", table_name=\"collected_files\"}",
+            "legendFormat": "collected_files",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}
+

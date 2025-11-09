@@ -1,0 +1,105 @@
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 7d
+    retentionSize: 10GB
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    additionalScrapeConfigs:
+      - job_name: 'opentelemetry-collector'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - monitoring
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_name]
+            regex: 'opentelemetry-collector.*'
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            regex: 'prometheus'
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: '${1}:8889'
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+      - job_name: 'mysql-exporter'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - harman-system
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            regex: 'mysql-exporter'
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            regex: 'metrics'
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: '${1}:9104'
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+
+grafana:
+  enabled: true
+  adminPassword: admin
+  service:
+    type: NodePort
+    nodePort: 30000
+  persistence:
+    enabled: true
+    size: 10Gi
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://prometheus-operated.monitoring.svc.cluster.local:9090
+          isDefault: true
+          editable: true
+        - name: Tempo
+          type: tempo
+          access: proxy
+          url: http://tempo.monitoring.svc.cluster.local:3200
+          jsonData:
+            httpMethod: GET
+            tracesToLogs:
+              datasourceUid: Loki
+              tags: ['job', 'instance', 'pod', 'namespace']
+              mappedTags: [{ key: 'service.name', value: 'service' }]
+              mapTagNamesEnabled: false
+              spanStartTimeShift: '1h'
+              spanEndTimeShift: '1h'
+              filterByTraceID: false
+              filterBySpanID: false
+        - name: Loki
+          type: loki
+          access: proxy
+          url: http://loki.monitoring.svc.cluster.local:3100
+          jsonData:
+            maxLines: 1000
+
+alertmanager:
+  enabled: false
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+prometheusOperator:
+  enabled: true
+
