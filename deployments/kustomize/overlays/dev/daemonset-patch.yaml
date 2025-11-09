@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: file-collector
+  namespace: harman-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: collector
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "opentelemetry-collector.monitoring.svc.cluster.local:4317"
+

@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: file-collector
+  namespace: harman-system
+  labels:
+    app: file-collector
+spec:
+  selector:
+    matchLabels:
+      app: file-collector
+  template:
+    metadata:
+      labels:
+        app: file-collector
+    spec:
+      containers:
+      - name: collector
+        image: harman-collector:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        # ConfigMap에서 환경 변수 주입
+        - name: MOUNT_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: collector-config
+              key: MOUNT_PATH
+        - name: COLLECT_INTERVAL_MINUTES
+          valueFrom:
+            configMapKeyRef:
+              name: collector-config
+              key: COLLECT_INTERVAL_MINUTES
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: collector-config
+              key: LOG_LEVEL
+        # Secret에서 환경 변수 주입
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: DB_PORT
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: DB_PASSWORD
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: DB_NAME
+        # Downward API로 노드명 주입
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: host-data
+          mountPath: /mnt/harman
+          readOnly: true
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+      volumes:
+      - name: host-data
+        hostPath:
+          path: /mnt/harman
+          type: DirectoryOrCreate
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+
